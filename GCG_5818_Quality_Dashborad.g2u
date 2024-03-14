@@ -1,0 +1,739 @@
+Program.Sub.ScreenSU.Start
+Gui.FrmMain..Create
+Gui.FrmMain..Caption("Quality Dashboard")
+Gui.FrmMain..Size(15315,10470)
+Gui.FrmMain..MinX(0)
+Gui.FrmMain..MinY(0)
+Gui.FrmMain..Position(0,0)
+Gui.FrmMain..BackColor(-2147483633)
+Gui.FrmMain..MousePointer(0)
+Gui.FrmMain..Event(UnLoad,FrmMain_UnLoad)
+Gui.FrmMain.tabQuality.Create(Tab)
+Gui.FrmMain.tabQuality.Size(15120,9090)
+Gui.FrmMain.tabQuality.Position(60,1065)
+Gui.FrmMain.tabQuality.Tabs(2)
+Gui.FrmMain.tabQuality.SetTab(0)
+Gui.FrmMain.tabQuality.Caption("Open NCMR's")
+Gui.FrmMain.tabQuality.SetTab(1)
+Gui.FrmMain.tabQuality.Caption("Open RMA's")
+Gui.FrmMain.GsGCNCMR.Create(GsGridControl)
+Gui.FrmMain.GsGCNCMR.Size(15000,8745)
+Gui.FrmMain.GsGCNCMR.Position(0,0)
+Gui.FrmMain.GsGCNCMR.Parent("tabQuality",0)
+Gui.FrmMain.GsGCNCMR.Event(RowCellClick,GsGCNCMR_RowCellClick)
+Gui.FrmMain.GsGCNCMR.Event(CellValueChanged,GsGCNCMR_CellValueChanged)
+Gui.FrmMain.GsGCRMA.Create(GsGridControl)
+Gui.FrmMain.GsGCRMA.Size(15000,8745)
+Gui.FrmMain.GsGCRMA.Position(0,0)
+Gui.FrmMain.GsGCRMA.Parent("tabQuality",1)
+Gui.FrmMain.GsGCRMA.Event(RowCellClick,GsGCRMA_RowCellClick)
+Gui.FrmMain.framePermissions.Create(Frame)
+Gui.FrmMain.framePermissions.Size(1965,390)
+Gui.FrmMain.framePermissions.Position(13215,15)
+Gui.FrmMain.optView.Create(Option)
+Gui.FrmMain.optView.Size(690,195)
+Gui.FrmMain.optView.Position(225,150)
+Gui.FrmMain.optView.Caption("View")
+Gui.FrmMain.optView.BackColor(15790320)
+Gui.FrmMain.optView.ForeColor(0)
+Gui.FrmMain.optView.Parent("framePermissions")
+Gui.FrmMain.optEdit.Create(Option)
+Gui.FrmMain.optEdit.Enabled(False)
+Gui.FrmMain.optEdit.Size(690,195)
+Gui.FrmMain.optEdit.Position(1050,150)
+Gui.FrmMain.optEdit.Caption("Edit")
+Gui.FrmMain.optEdit.Parent("framePermissions")
+Gui.FrmMain.picGSSLogo.Create(PictureBox)
+Gui.FrmMain.picGSSLogo.Size(4125,960)
+Gui.FrmMain.picGSSLogo.Position(5520,45)
+Gui.FrmMain.picGSSLogo.Event(DblClick,picGSSLogo_DblClick)
+Gui.FrmMain.picGSSLogo.ToolTip("Double-Click for additional functions")
+Gui.FrmMain.pbStatus.Create(ProgressBar)
+Gui.FrmMain.pbStatus.Visible(False)
+Gui.FrmMain.pbStatus.Size(2250,255)
+Gui.FrmMain.pbStatus.Position(75,375)
+Gui.FrmMain.lblStatus.Create(Label,"Loading Quality Dashboard....",False,2250,255,0,75,135,True,0,"Arial",8,-986896,0)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+	V.Global.bLoadData.Declare
+	V.Global.bLongPart.Declare
+	V.Global.bGroup.Declare
+	'Program.External.Include.Library("GAB_Canny.lib")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'TJS, JAN 2020
+'CUSTOMER: LAKEVIEW INDUSTRIES
+'BUSINESS CASE:
+'Lakeview would like to add 4 or 5 user fields to their Quality dashboard.  This data will be used later for reporting purposes.
+
+'SOLUTION:
+'Create a custom table that keys on the NCMR number.  Include 5 user fields (customer will have to specify the type and size of the fields).  Modify the customers version of 4457 Quality Dashboard, add the new user fields to the grid.  Make the fields editable so they can record data and it gets written back to the custom table.
+'Added table GCG5_5818_QUAL_UF
+
+F.Intrinsic.Control.Try
+V.Local.sIcon.Declare
+V.Local.sGssLogo.Declare
+
+F.Intrinsic.String.Build("{0}\GAB\GAS\gss2.ico",V.Caller.PluginsDir,V.Local.sIcon)
+F.Intrinsic.String.Build("{0}\GAB\GAS\GAB_GSS_Logo_Green_Dash.png",V.Caller.PluginsDir,V.Local.sGssLogo)
+Gui.FrmMain..Icon(V.Local.sIcon)
+'Gui.FrmWeb..Icon(V.Local.sIcon)
+Gui.FrmMain.picGSSLogo.Picture(V.Local.sGssLogo)
+
+'Canny
+'F.Intrinsic.Control.CallSub(CannyCheckUser,"Form","FrmMain")
+
+Gui.FrmMain.optView.Value(True)
+
+Gui.FrmMain.tabQuality.SetTab(0)
+
+F.Global.Security.IsInGroup(V.Caller.User,"EditQual",V.Caller.CompanyCode,V.Global.bGroup)
+F.Intrinsic.Control.If(V.Global.bGroup)
+	Gui.FrmMain.optEdit.Enabled(True)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.CallSub(SetAnchors)
+F.Intrinsic.Control.CallSub(CheckLongPart)
+
+F.ODBC.Connection!con.OpenCompanyConnection(500)
+
+Gui.FrmMain..Show
+F.Intrinsic.Control.CallSub(SetTabAnchors)
+F.Intrinsic.Control.CallSub(SetContextMenus)
+F.Intrinsic.Control.CallSub(loaddtncmr)
+F.Intrinsic.Control.CallSub(loaddtrma)
+F.Intrinsic.Control.CallSub(Deserialize)
+	
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.SetAnchors.Start
+F.Intrinsic.Control.Try
+
+'0 - None
+'1 - Top
+'2 - Bottom
+'4 - Left
+'8 - Right
+
+Gui.FrmMain.tabQuality.Anchor(15)
+'Gui.FrmMain.frameButtons.Anchor(9)
+Gui.FrmMain.framePermissions.Anchor(9)
+Gui.FrmMain.picGSSLogo.Anchor(1)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetAnchors.End
+
+Program.Sub.SetTabAnchors.Start
+F.Intrinsic.Control.Try
+
+'0 - None
+'1 - Top
+'2 - Bottom
+'4 - Left
+'8 - Right
+
+Gui.FrmMain.GsGCNCMR.Anchor(15)
+Gui.FrmMain.GsGCRMA.Anchor(15)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetTabAnchors.End
+
+Program.Sub.CheckLongPart.Start
+F.Intrinsic.Control.Try
+
+F.Global.General.ReadOption("400861",0,False,"0000",V.Global.bLongPart)
+F.Intrinsic.Control.If(V.Global.bLongPart,=,False)
+	F.Global.General.ReadOption("400861",0,False,"0004",V.Global.bLongPart)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.CheckLongPart.End
+
+Program.Sub.SetContextMenus.Start
+F.Intrinsic.Control.Try
+
+Gui.FrmMain..ContextMenuCreate("ctxNCMR")
+Gui.FrmMain.GsGCNCMR.ContextMenuAttach("ctxNCMR")
+Gui.FrmMain..ContextMenuAddItem("ctxNCMR","Refresh",0,"Refresh")
+Gui.FrmMain..ContextMenuAddItem("ctxNCMR","Export",0,"Export")
+Gui.FrmMain..ContextMenuAddItem("ctxNCMR","ResetColumns",0,"Reset Columns")
+Gui.FrmMain..ContextMenuSetItemEventHandler("ctxNCMR","Refresh","MenuClickRefresh")
+Gui.FrmMain..ContextMenuSetItemEventHandler("ctxNCMR","Export","MenuClickExport")
+Gui.FrmMain..ContextMenuSetItemEventHandler("ctxNCMR","ResetColumns","MenuClickResetColumns")
+
+Gui.FrmMain..ContextMenuCreate("ctxRMA")
+Gui.FrmMain.GsGCRMA.ContextMenuAttach("ctxRMA")
+Gui.FrmMain..ContextMenuAddItem("ctxRMA","Refresh",0,"Refresh")
+Gui.FrmMain..ContextMenuAddItem("ctxRMA","Export",0,"Export")
+Gui.FrmMain..ContextMenuAddItem("ctxRMA","ResetColumns",0,"Reset Columns")
+Gui.FrmMain..ContextMenuSetItemEventHandler("ctxRMA","Refresh","MenuClickRefresh")
+Gui.FrmMain..ContextMenuSetItemEventHandler("ctxRMA","Export","MenuClickExport")
+Gui.FrmMain..ContextMenuSetItemEventHandler("ctxRMA","ResetColumns","MenuClickResetColumns")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetContextMenus.End
+
+Program.Sub.MenuClickRefresh.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.CallSub(cmdRefresh_Click)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.MenuClickRefresh.End
+
+Program.Sub.MenuClickExport.Start
+F.Intrinsic.Control.Try
+
+V.Local.sFileExport.Declare
+V.Local.bExcel.Declare
+V.Local.bFileLocked.Declare
+V.Local.sMsg.Declare
+V.Local.sControl.Declare
+
+F.Intrinsic.Control.SelectCase(V.Args.MenuName)
+	F.Intrinsic.Control.Case("CTXNCMR")
+		V.Local.sControl.Set("GsGCNCMR")
+	F.Intrinsic.Control.Case("CTXRMA")
+		V.Local.sControl.Set("GsGCRMA")
+F.Intrinsic.Control.EndSelect
+
+F.Automation.MSExcel.CheckPresence(V.Local.bExcel)
+F.Intrinsic.Control.If(V.Local.bExcel)
+	F.Intrinsic.String.Build("{0}\GAB_5818_{1}_Export.xlsx",V.Caller.LocalGssTempDir,V.Local.sControl,V.Local.sFileExport)
+	F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+	F.Intrinsic.Control.If(V.Local.bFileLocked)
+		F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+		F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+	F.Intrinsic.Control.Else
+		Gui.FrmMain.[V.Local.sControl].Export(V.Local.sFileExport,"xlsx")
+		F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("{0}\GAB_5818_{1}_Export.csv",V.Caller.LocalGssTempDir,V.Local.sControl,V.Local.sFileExport)
+	F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+	F.Intrinsic.Control.If(V.Local.bFileLocked)
+		F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+		F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+	F.Intrinsic.Control.Else
+		Gui.FrmMain.[V.Local.sControl].Export(V.Local.sFileExport,"csv")
+	F.Intrinsic.Control.EndIf
+	F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.MenuClickExport.End
+
+Program.Sub.MenuClickResetColumns.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.SelectCase(V.Args.MenuName)
+	F.Intrinsic.Control.Case("CTXALL")
+		F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"GVNCMR",5818,1000,False,"Serialize",False,0,-999.0,1/1/1980,12:00:00 AM,"")
+	F.Intrinsic.Control.Case("CTXTODAY")
+		F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"GVRMA",5818,1000,False,"Serialize",False,0,-999.0,1/1/1980,12:00:00 AM,"")
+F.Intrinsic.Control.EndSelect
+
+V.Global.bLoadData.Set(False)
+F.Intrinsic.Control.CallSub(cmdRefresh_Click)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.MenuClickResetColumns.End
+
+Program.Sub.cmdRefresh_Click.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.Global.bLoadData)
+	F.Intrinsic.Control.CallSub(Serialize)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.CallSub(loaddtncmr)
+F.Intrinsic.Control.CallSub(loaddtrma)
+F.Intrinsic.Control.CallSub(Deserialize)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdRefresh_Click.End
+
+Program.Sub.cmdExport_Click.Start
+F.Intrinsic.Control.Try
+
+V.Local.sFileExport.Declare
+V.Local.bExcel.Declare
+V.Local.bFileLocked.Declare
+V.Local.sMsg.Declare
+
+F.Automation.MSExcel.CheckPresence(V.Local.bExcel)
+
+F.Intrinsic.Control.If(V.Screen.FrmMain!tabQuality.Tab,=,0)
+    F.Intrinsic.Control.If(V.Local.bExcel)
+        F.Intrinsic.String.Build("{0}\GAB_5818_NCMR_Export.xlsx",V.Caller.LocalGssTempDir,V.Local.sFileExport)
+        F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+        F.Intrinsic.Control.If(V.Local.bFileLocked)
+            F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+            F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+        F.Intrinsic.Control.Else
+            Gui.FrmMain.GsGCNCMR.Export(V.Local.sFileExport,"xlsx")
+            F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+        F.Intrinsic.Control.EndIf
+    F.Intrinsic.Control.Else
+        F.Intrinsic.String.Build("{0}\GAB_5818_NCMR_Export.csv",V.Caller.LocalGssTempDir,V.Local.sFileExport)
+        F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+        F.Intrinsic.Control.If(V.Local.bFileLocked)
+            F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+            F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+        F.Intrinsic.Control.Else
+            Gui.FrmMain.GsGCNCMR.Export(V.Local.sFileExport,"csv")
+        F.Intrinsic.Control.EndIf
+        F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+    F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Screen.FrmMain!tabQuality.Tab,=,1)
+    F.Intrinsic.Control.If(V.Local.bExcel)
+        F.Intrinsic.String.Build("{0}\GAB_5818_RMA_Export.xlsx",V.Caller.LocalGssTempDir,V.Local.sFileExport)
+        F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+        F.Intrinsic.Control.If(V.Local.bFileLocked)
+            F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+            F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+        F.Intrinsic.Control.Else
+            Gui.FrmMain.GsGCRMA.Export(V.Local.sFileExport,"xlsx")
+            F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+        F.Intrinsic.Control.EndIf
+    F.Intrinsic.Control.Else
+        F.Intrinsic.String.Build("{0}\GAB_5818_RMA_Export.csv",V.Caller.LocalGssTempDir,V.Local.sFileExport)
+        F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+        F.Intrinsic.Control.If(V.Local.bFileLocked)
+            F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+            F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+        F.Intrinsic.Control.Else
+            Gui.FrmMain.GsGCRMA.Export(V.Local.sFileExport,"csv")
+        F.Intrinsic.Control.EndIf
+        F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+    F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdExport_Click.End
+
+Program.Sub.LoadDtNCMR.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.DataTable.dtNCMR.Exists)
+	F.Data.DataTable.Close("dtNCMR")
+F.Intrinsic.Control.EndIf
+
+V.Global.bLoadData.Set(True)
+'5818:  Joined new table, GCG5_5818_QUAL_UF to existing dtNCMR datatable.
+F.Data.DataTable.CreateFromSQL("dtNCMR","con","SELECT A.CONTROL_NUMBER,A.NAME,COALESCE(A.PART,'') AS PART,'' As DISPLAY_PART,A.LOCATION,A.DESCRIPTION,A.QTY_REMAINING,A.USER1,A.SCRAP_CODE,B.USERFIELD_1,B.USERFIELD_2,B.USERFIELD_3,B.USERFIELD_4,B.USERFIELD_5 FROM QUALITY A LEFT JOIN GCG5_5818_QUAL_UF B ON A.CONTROL_NUMBER = B.CONTROL_NUMBER WHERE QTY_REMAINING > 0;",True)
+F.Data.DataTable.AddDisplayPartColumn("dtNCMR",0,"PART","DISPLAY_PART")
+
+F.Intrinsic.Control.CallSub(loadgvncmr)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadDtNCMR.End
+
+Program.Sub.LoadGvNCMR.Start
+F.Intrinsic.Control.Try
+
+'5818:  Added Userfields 1 thorugh 5
+
+Gui.FrmMain.GsGCNCMR.AddGridViewFromDataTable("gvNCMR","dtNCMR")
+Gui.FrmMain.GsGCNCMR.SuspendLayout()
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","MultiSelect",True)
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","OptionBehaviorEditable",True)
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","AllowSort",True)
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","AllowFilter",True)
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","OptionsDetailShowDetailTabs",False)
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","OptionsViewShowGroupPanel",True)
+Gui.FrmMain.GsGCNCMR.SetGridViewProperty("gvNCMR","EnableAppearanceOddRow",True)
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","PART","Visible",False)
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","AllowEdit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","NAME","AllowEdit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DISPLAY_PART","AllowEDit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","LOCATION","AllowEDit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DESCRIPTION","AllowEdit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","QTY_REMAINING","AllowEdit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USER1","AllowEdit",False)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","SCRAP_CODE","AllowEdit",False)
+
+F.Intrinsic.Control.If(V.Global.bGroup)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_1","AllowEdit",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_2","AllowEdit",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_3","AllowEdit",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_4","AllowEdit",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_5","AllowEdit",True)
+	
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_1","ReadOnly",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_2","ReadOnly",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_3","ReadOnly",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_4","ReadOnly",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_5","ReadOnly",False)
+F.Intrinsic.Control.Else
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_1","AllowEdit",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_2","AllowEdit",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_3","AllowEdit",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_4","AllowEdit",False)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_5","AllowEdit",False)
+	
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_1","ReadOnly",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_2","ReadOnly",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_3","ReadOnly",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_4","ReadOnly",True)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_5","ReadOnly",True)
+F.Intrinsic.Control.EndIf
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","Caption","NCMR")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","NAME","Caption","Customer/Vendor")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DISPLAY_PART","Caption","Part Number")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","LOCATION","Caption","Loc")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DESCRIPTION","Caption","Description")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","QTY_REMAINING","Caption","Qty Open")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USER1","Caption","Reference")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","SCRAP_CODE","Caption","Scrap Code")
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","MinWidth","60")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","NAME","MinWidth","200")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DISPLAY_PART","MinWidth","100")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","LOCATION","MinWidth","40")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DESCRIPTION","MinWidth","200")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","QTY_REMAINING","MinWidth","60")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USER1","MinWidth","130")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","SCRAP_CODE","MinWidth","75")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_1","MinWidth","200")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_2","MinWidth","200")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_3","MinWidth","200")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_4","MinWidth","200")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_5","MinWidth","200")
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","NAME","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DISPLAY_PART","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","LOCATION","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DESCRIPTION","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","QTY_REMAINING","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USER1","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","SCRAP_CODE","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_1","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_2","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_3","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_4","HeaderFontBold",True)
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","USERFIELD_5","HeaderFontBold",True)
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","QTY_REMAINING","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","SCRAP_CODE","HeaderHAlignment","Center")
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","CellHAlignment","Center")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","QTY_REMAINING","CellHAlignment","Center")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","SCRAP_CODE","CellHAlignment","Center")
+
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","CONTROL_NUMBER","CellForeColor","Blue")
+Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DISPLAY_PART","CellForeColor","Blue")
+
+F.Intrinsic.Control.If(V.Global.bLongPart)
+	Gui.FrmMain.GsGCNCMR.SetColumnProperty("gvNCMR","DISPLAY_PART","MinWidth","250")
+F.Intrinsic.Control.EndIf
+
+Gui.FrmMain.GsGCNCMR.ResumeLayout()
+Gui.FrmMain.GsGCNCMR.MainView("gvNCMR")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadGvNCMR.End
+
+Program.Sub.GsGCNCMR_RowCellClick.Start
+F.Intrinsic.Control.Try
+
+V.Local.sParam.Declare
+V.Local.sPart.Declare
+V.Local.sReV.Declare
+
+F.Intrinsic.Control.SelectCase(V.Args.Column)
+	F.Intrinsic.Control.Case("CONTROL_NUMBER")
+		F.Intrinsic.String.Build("{0}!*!{1}",V.Caller.CompanyCode,V.Args.cellValue,V.Local.sParam)
+		F.Global.General.CallWrapperSync(2001,V.Local.sParam)
+
+	F.Intrinsic.Control.Case("DISPLAY_PART")
+		Gui.FrmMain.GsGCNCMR.GetCellValueByColumnName("gvNCMR","PART",V.Args.RowIndex,V.Local.sPart)
+		F.Intrinsic.Control.If(V.Screen.FrmMain!optView.Value)
+			F.Intrinsic.String.ConcatCallWrapperArgs(V.Local.sPart,"","O",V.Local.sParam)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.ConcatCallWrapperArgs(V.Local.sPart,"","M",V.Local.sParam)
+		F.Intrinsic.Control.EndIf
+		F.Global.General.CallWrapperAsync(300011,V.Local.sParam)
+
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GsGCNCMR_RowCellClick.End
+
+Program.Sub.GsGCNCMR_CellValueChanged.Start
+'5818:  Added to insert or update notes in GCG5_5818_QUAL_UF table.
+F.Intrinsic.Control.Try
+V.Local.sControl.Declare
+V.Local.sSQL.Declare
+
+V.Local.sControl.Set(V.DataTable.dtNCMR(V.Args.RowIndex).CONTROL_NUMBER.FieldValTrim)
+
+F.Intrinsic.String.Build("Select * from GCG5_5818_QUAL_UF where CONTROL_NUMBER = '{0}'",V.Local.sControl,V.Local.sSQL)
+F.ODBC.Connection!con.ExecuteAndReturn(V.Local.sSQL,V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.Ambient.ExecuteAndReturnEOF)
+	F.Intrinsic.String.Build("Insert into GCG5_5818_QUAL_UF (CONTROL_NUMBER,{0}) values('{1}','{2}')",V.Args.Column.Trim,V.Local.sControl.Trim,V.Args.Value.PSQLFriendly.Trim,V.Local.sSQL)
+	F.ODBC.Connection!con.Execute(V.Local.sSQL)
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("update GCG5_5818_QUAL_UF set {0} = '{1}' where CONTROL_NUMBER = '{2}'",V.Args.Column.Trim,V.Args.Value.PSQLFriendly.Trim,V.Local.sControl.Trim,V.Local.sSQL)
+	F.ODBC.Connection!con.Execute(V.Local.sSQL)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GsGCNCMR_CellValueChanged.End
+
+Program.Sub.LoadDtRMA.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.DataTable.dtRMA.Exists)
+	F.Data.DataTable.Close("dtRMA")
+F.Intrinsic.Control.EndIf
+
+F.Data.DataTable.CreateFromSQL("dtRMA","con","SELECT A.RMA_ID,B.NAME_CUSTOMER,A.ORDER_NO,A.ORDER_LINE,COALESCE(PART,'') AS PART,'' As DISPLAY_PART,LOCATION,A.PART_DESCRIPTION,A.QTY_RETURNED,A.QTY_RECEIVED,A.QTY_PERF_COMPLETE FROM V_RMA_LINES A LEFT JOIN V_RMA_HEADER B ON A.RMA_ID = B.RMA_ID",True)
+F.Data.DataTable.AddDisplayPartColumn("dtRMA",0,"PART","DISPLAY_PART")
+
+F.Intrinsic.Control.CallSub(loadgvrma)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadDtRMA.End
+
+Program.Sub.LoadGvRMA.Start
+F.Intrinsic.Control.Try
+
+Gui.FrmMain.GsGCRMA.AddGridViewFromDataTable("gvRMA","dtRMA")
+Gui.FrmMain.GsGCRMA.SuspendLayout()
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","MultiSelect",True)
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","OptionBehaviorEditable",True)
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","AllowSort",True)
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","AllowFilter",True)
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","OptionsDetailShowDetailTabs",False)
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","OptionsViewShowGroupPanel",True)
+Gui.FrmMain.GsGCRMA.SetGridViewProperty("gvRMA","EnableAppearanceOddRow",True)
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","PART","Visible",False)
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","NAME_CUSTOMER","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_NO","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_LINE","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","DISPLAY_PART","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","LOCATION","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","PART_DESCRIPTION","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RETURNED","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RECEIVED","AllowEdit",False)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_PERF_COMPLETE","AllowEdit",False)
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","Caption","RMA #")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","NAME_CUSTOMER","Caption","Customer")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_NO","Caption","Sales Order")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_LINE","Caption","SO Line")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","DISPLAY_PART","Caption","Part Number")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","LOCATION","Caption","Loc")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","PART_DESCRIPTION","Caption","Description")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RETURNED","Caption","RMA Qty")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RECEIVED","Caption","Returned Qty")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_PERF_COMPLETE","Caption","Serviced Qty")
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","MinWidth","50")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","NAME_CUSTOMER","MinWidth","200")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_NO","MinWidth","60")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_LINE","MinWidth","60")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","DISPLAY_PART","MinWidth","130")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","LOCATION","MinWidth","40")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","PART_DESCRIPTION","MinWidth","200")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RETURNED","MinWidth","95")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RECEIVED","MinWidth","95")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_PERF_COMPLETE","MinWidth","95")
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","NAME_CUSTOMER","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_NO","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_LINE","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","DISPLAY_PART","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","LOCATION","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","PART_DESCRIPTION","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RETURNED","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RECEIVED","HeaderFontBold",True)
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_PERF_COMPLETE","HeaderFontBold",True)
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_NO","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_LINE","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RETURNED","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RECEIVED","HeaderHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_PERF_COMPLETE","HeaderHAlignment","Center")
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","CellHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_NO","CellHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","ORDER_LINE","CellHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RETURNED","CellHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_RECEIVED","CellHAlignment","Center")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","QTY_PERF_COMPLETE","CellHAlignment","Center")
+
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","RMA_ID","CellForeColor","Blue")
+Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","DISPLAY_PART","CellForeColor","Blue")
+
+F.Intrinsic.Control.If(V.Global.bLongPart)
+	Gui.FrmMain.GsGCRMA.SetColumnProperty("gvRMA","DISPLAY_PART","MinWidth","250")
+F.Intrinsic.Control.EndIf
+
+Gui.FrmMain.GsGCRMA.ResumeLayout()
+Gui.FrmMain.GsGCRMA.MainView("gvRMA")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadGvRMA.End
+
+Program.Sub.GsGCRMA_RowCellClick.Start
+F.Intrinsic.Control.Try
+
+V.Local.sParam.Declare
+V.Local.sPart.Declare
+V.Local.sReV.Declare
+V.Local.iRet.Declare
+
+F.Intrinsic.Control.SelectCase(V.Args.Column)
+	F.Intrinsic.Control.Case("RMA_ID")
+		F.Global.General.LaunchMenuTask(399,0,V.Local.iRet)
+	F.Intrinsic.Control.Case("DISPLAY_PART")
+		Gui.FrmMain.GsGCRMA.GetCellValueByColumnName("gvRMA","PART",V.Args.RowIndex,V.Local.sPart)
+		F.Intrinsic.Control.If(V.Screen.FrmMain!optView.Value,=,True)
+			F.Intrinsic.String.ConcatCallWrapperArgs(V.Local.sPart,"","O",V.Local.sParam)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.ConcatCallWrapperArgs(V.Local.sPart,"","M",V.Local.sParam)
+		F.Intrinsic.Control.EndIf
+		F.Global.General.CallWrapperAsync(300011,V.Local.sParam)
+
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GsGCRMA_RowCellClick.End
+
+Program.Sub.picGSSLogo_DblClick.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Task.ShellExec(0,"Open","http://www.globalshopsolutions.com/login-customer","","",0)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.picGSSLogo_DblClick.End
+
+Program.Sub.Serialize.Start
+F.Intrinsic.Control.Try
+
+V.Local.sSerialize.Declare
+
+'gvNCMR
+Gui.FrmMain.GsGCNCMR.Serialize("gvNCMR",V.Local.sSerialize)
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"GVNCMR",5818,1000,False,"Serialize",False,0,-999.0,1/1/1980,12:00:00 AM,V.Local.sSerialize)
+'gvRMA
+Gui.FrmMain.GsGCRMA.Serialize("gvRMA",V.Local.sSerialize)
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"GVRMA",5818,1000,False,"Serialize",False,0,-999.0,1/1/1980,12:00:00 AM,V.Local.sSerialize)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Serialize.End
+
+Program.Sub.Deserialize.Start
+F.Intrinsic.Control.Try
+
+V.Local.sSerialize.Declare
+
+'Delete old registry records
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"GVNCMR",5818,0,5,"",V.Local.sSerialize)
+F.Intrinsic.Control.If(V.Local.sSerialize,<>,"")
+	F.ODBC.Connection!common.OpenConnection(V.Ambient.Ccon,V.Ambient.Cuser,V.Ambient.Cpass)
+	F.ODBC.Connection!common.Execute("Delete From Gs_Registry Where Reg_ID = 5818 And Seq < 1000;")
+	F.ODBC.Connection!common.Close
+F.Intrinsic.Control.EndIf
+
+'gvNCMR
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"GVNCMR",5818,1000,6,"",V.Local.sSerialize)
+F.Intrinsic.Control.If(V.Local.sSerialize.Trim,<>,"")
+	Gui.FrmMain.GsGCNCMR.Deserialize(V.Local.sSerialize)
+F.Intrinsic.Control.EndIf
+'gvRMA
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"GVRMA",5818,1000,6,"",V.Local.sSerialize)
+F.Intrinsic.Control.If(V.Local.sSerialize.Trim,<>,"")
+	Gui.FrmMain.GsGCRMA.Deserialize(V.Local.sSerialize)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Deserialize.End
+
+Program.Sub.FrmMain_UnLoad.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.Global.bLoadData)
+	F.Intrinsic.Control.CallSub(Serialize)
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End 
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.FrmMain_UnLoad.End
+
+Program.Sub.Error.Start
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+V.Local.sError.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
+
+Program.Sub.Comments.Start
+${$5$}$2.0.0.0$}$2
+${$6$}$rrodriguez$}$20210915110438770$}$YnvOFTUOxTrnxbSzMvfBmnrP7dtKqN6ZKEdpzIv886oMriywFPYwRl6bqV2wMYmuWa9gNnhbmSZFl0MKg0JcRQ==
+Program.Sub.Comments.End
